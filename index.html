@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ATS-Friendly CV Builder</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Open+Sans:wght@400;700&family=Roboto:wght@400;700&family=Source+Sans+3:wght@400;700&family=Merriweather:wght@400;700&display=swap">
+<style>
+ body{background:#e9edf1}
+ .editor{height:100vh;overflow-y:auto;background:#fff;border-right:1px solid #d5dbe1}
+ .viewer{height:100vh;overflow-y:auto;padding:24px}
+ details{border-bottom:1px solid #e3e7eb;padding:8px 0}
+ summary{font-weight:600;cursor:pointer;padding:4px 0}
+ .entry{background:#f6f8fa;border:1px solid #dde3e9;border-radius:6px;padding:10px;margin:8px 0}
+ .ok{color:#1a7f37}.warn{color:#b35900}
+ #cv{-webkit-print-color-adjust:exact;print-color-adjust:exact;background:#fff;margin:0 auto;box-sizing:border-box;color:#000;font-family:var(--f);font-size:var(--sz);line-height:var(--lh);box-shadow:0 2px 10px rgba(0,0,0,.15)}
+ #cv h1{font-size:calc(var(--sz)*2.1);margin:0 0 2px;line-height:1.2;color:var(--n)}
+ #cv .hdr{display:flex;justify-content:space-between;align-items:center;gap:16px}
+ #cv .ph{width:28mm;height:28mm;object-fit:cover;flex:none}
+ #cv .ph.round{border-radius:50%}
+ #cv .ttl{font-size:calc(var(--sz)*1.2);margin-bottom:3px;color:var(--n)}
+ #cv.center .hdr{flex-direction:column-reverse;text-align:center}
+ #cv .ct{color:#333}
+ #cv h2{font-size:calc(var(--sz)*1.1);margin:14px 0 6px;padding-bottom:2px;color:var(--c);break-after:avoid}
+ #cv.caps h2{text-transform:uppercase}
+ #cv.h-line h2{border-bottom:1.5px solid var(--c)}
+ #cv.h-bar h2{border-left:4px solid var(--c);padding-left:8px}
+ #cv.h-tint h2{background:var(--t);padding:3px 8px;border-radius:2px}
+ .sw{width:26px;height:26px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px #999;padding:0}
+ #cv .item{break-inside:avoid;margin-bottom:6px}
+ #cv .row1{display:flex;justify-content:space-between;gap:12px;font-weight:bold}
+ #cv .row1 span:last-child{font-weight:normal;white-space:nowrap}
+ #cv .sub{font-style:italic;color:#333}
+ #cv ul{margin:3px 0 4px 18px;padding:0}
+ #cv p{margin:0 0 6px}
+ @media print{
+  body{background:#fff}.no-print{display:none!important}
+  .viewer{height:auto;overflow:visible;padding:0}
+  #cv{box-shadow:none;padding:0!important;width:auto!important;min-height:0!important;margin:0}
+ }
+ @media(max-width:991px){.editor,.viewer{height:auto}#cv{width:100%!important}}
+</style>
+<style id="pg"></style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+<div class="container-fluid"><div class="row">
+
+<div class="col-lg-5 editor p-3 no-print">
+ <div class="d-flex flex-wrap gap-1 align-items-center">
+  <h1 class="h5 m-0 me-auto">CV Builder</h1>
+  <button class="btn btn-primary btn-sm" onclick="window.print()">Download PDF</button>
+  <label class="btn btn-success btn-sm m-0">Import PDF<input type="file" id="pdfImport" accept="application/pdf,.pdf" hidden></label>
+  <button class="btn btn-outline-secondary btn-sm" id="backup">Backup</button>
+  <label class="btn btn-outline-secondary btn-sm m-0">Restore<input type="file" id="restore" accept=".json" hidden></label>
+  <button class="btn btn-outline-secondary btn-sm" id="sample">Sample</button>
+  <button class="btn btn-outline-danger btn-sm" id="reset">Clear</button>
+ </div>
+ <p class="text-muted small mt-2 mb-1">In the print window choose "Save as PDF" and turn off "Headers and footers".</p>
+
+ <div id="importMsg"></div>
+ <details open><summary>ATS check</summary><ul id="ats" class="small mb-0"></ul></details>
+
+ <details id="design"><summary>Fonts and layout</summary>
+  <div class="row g-2 small">
+   <div class="col-12"><label>Font</label>
+    <select name="font" class="form-select form-select-sm">
+     <optgroup label="Safe system fonts">
+      <option value="Arial, Helvetica, sans-serif">Arial</option>
+      <option value="Calibri, Carlito, Arial, sans-serif">Calibri</option>
+      <option value="Verdana, Geneva, sans-serif">Verdana</option>
+      <option value="Tahoma, Geneva, sans-serif">Tahoma</option>
+      <option value="'Times New Roman', Times, serif">Times New Roman</option>
+      <option value="Georgia, serif">Georgia</option>
+      <option value="Cambria, Georgia, serif">Cambria</option>
+     </optgroup>
+     <optgroup label="Web fonts (embedded in PDF)">
+      <option value="Lato, sans-serif">Lato</option>
+      <option value="'Open Sans', sans-serif">Open Sans</option>
+      <option value="Roboto, sans-serif">Roboto</option>
+      <option value="'Source Sans 3', sans-serif">Source Sans</option>
+      <option value="Merriweather, serif">Merriweather</option>
+     </optgroup>
+    </select></div>
+   <div class="col-6"><label>Text size: <b id="v_size"></b> pt</label><input type="range" name="size" min="9" max="12" step="0.5" class="form-range"></div>
+   <div class="col-6"><label>Line spacing: <b id="v_lh"></b></label><input type="range" name="lh" min="1.2" max="1.7" step="0.05" class="form-range"></div>
+   <div class="col-6"><label>Page margin: <b id="v_margin"></b> mm</label><input type="range" name="margin" min="8" max="25" step="1" class="form-range"></div>
+   <div class="col-6"><label>Paper</label><select name="paper" class="form-select form-select-sm"><option value="A4">A4</option><option value="Letter">US Letter</option></select></div>
+   <div class="col-12 d-flex flex-wrap gap-2 align-items-center"><span>Color themes:</span>
+    <button class="sw" data-c="#000000" style="background:#000" title="Classic black"></button>
+    <button class="sw" data-c="#1f4e8c" style="background:#1f4e8c" title="Blue"></button>
+    <button class="sw" data-c="#0b6e6e" style="background:#0b6e6e" title="Teal"></button>
+    <button class="sw" data-c="#6a2c70" style="background:#6a2c70" title="Plum"></button>
+    <button class="sw" data-c="#8b1e2d" style="background:#8b1e2d" title="Burgundy"></button>
+    <button class="sw" data-c="#2e6b3a" style="background:#2e6b3a" title="Forest"></button>
+    <button class="sw" data-c="#37474f" style="background:#37474f" title="Slate"></button></div>
+   <div class="col-6"><label>Accent color</label><input type="color" name="color" class="form-control form-control-color w-100"></div>
+   <div class="col-6"><label>Header alignment</label><select name="align" class="form-select form-select-sm"><option value="left">Left</option><option value="center">Centered</option></select></div>
+   <div class="col-6"><label>Heading style</label><select name="hstyle" class="form-select form-select-sm"><option value="line">Line underneath</option><option value="bar">Side bar</option><option value="tint">Tinted band</option><option value="none">Plain</option></select></div>
+   <div class="col-6 pt-1">
+    <div class="form-check"><input type="checkbox" name="caps" class="form-check-input" id="caps"><label for="caps" class="form-check-label">Uppercase headings</label></div>
+    <div class="form-check"><input type="checkbox" name="colorName" class="form-check-input" id="colorName"><label for="colorName" class="form-check-label">Color the name</label></div>
+   </div>
+  </div>
+ </details>
+
+ <details><summary>Profile photo (optional)</summary>
+  <p class="small text-muted mb-2">Many ATS tools ignore photos and some countries advise against them. Leave this off for US, UK and most online applications.</p>
+  <input type="file" id="photo" accept="image/*" class="form-control form-control-sm mb-2">
+  <div id="photoOpts" class="d-flex gap-3 align-items-center small" >
+   <div class="form-check"><input type="checkbox" name="photoOn" class="form-check-input" id="photoOn"><label for="photoOn" class="form-check-label">Show photo</label></div>
+   <select name="shape" class="form-select form-select-sm w-auto"><option value="round">Round</option><option value="square">Square</option></select>
+   <button class="btn btn-link btn-sm text-danger p-0" id="rmPhoto">Remove photo</button>
+  </div>
+ </details>
+
+ <details><summary>Section order and visibility</summary><div id="order" class="small"></div></details>
+
+ <details open><summary>Personal details</summary>
+  <div id="personal" class="row g-2">
+   <div class="col-6"><input name="name" class="form-control form-control-sm" placeholder="Full name"></div>
+   <div class="col-6"><input name="title" class="form-control form-control-sm" placeholder="Job title"></div>
+   <div class="col-6"><input name="email" class="form-control form-control-sm" placeholder="Email"></div>
+   <div class="col-6"><input name="phone" class="form-control form-control-sm" placeholder="Phone"></div>
+   <div class="col-6"><input name="location" class="form-control form-control-sm" placeholder="City, Country"></div>
+   <div class="col-6"><input name="link" class="form-control form-control-sm" placeholder="LinkedIn URL"></div>
+   <div class="col-12"><input name="link2" class="form-control form-control-sm" placeholder="Portfolio / GitHub URL"></div>
+  </div>
+ </details>
+
+ <details><summary>Summary</summary><textarea id="summary" class="form-control" rows="3" placeholder="2-3 sentences about your experience and strengths"></textarea></details>
+ <details><summary>Experience</summary><div id="exp"></div><button class="btn btn-outline-secondary btn-sm" onclick="addEntry('exp')">Add job</button></details>
+ <details><summary>Projects</summary><div id="proj"></div><button class="btn btn-outline-secondary btn-sm" onclick="addEntry('proj')">Add project</button></details>
+ <details><summary>Education</summary><div id="edu"></div><button class="btn btn-outline-secondary btn-sm" onclick="addEntry('edu')">Add education</button></details>
+ <details><summary>Skills</summary><textarea id="skills" class="form-control" rows="2" placeholder="Comma separated: JavaScript, SQL, Project management"></textarea></details>
+ <details><summary>Certifications</summary><div id="cert"></div><button class="btn btn-outline-secondary btn-sm" onclick="addEntry('cert')">Add certification</button></details>
+ <details><summary>Languages</summary><textarea id="lang" class="form-control" rows="2" placeholder="English (fluent), Bengali (native)"></textarea></details>
+ <details class="mb-4"><summary>Your own sections</summary><div id="custom"></div><button class="btn btn-outline-secondary btn-sm" onclick="addEntry('custom')">Add section</button></details>
+</div>
+
+<div class="col-lg-7 viewer"><div id="cv"></div></div>
+</div></div>
+
+<script>
+const $=s=>document.querySelector(s), KEY='cv-builder-v2';
+const TPL={
+ exp:[['title','Job title'],['company','Company'],['loc','Location'],['dates','Dates (e.g. Jan 2022 - Present)'],['bullets','Achievements (one per line)','ta']],
+ proj:[['name','Project name'],['link','Link (optional)'],['dates','Dates'],['bullets','What you did (one per line)','ta']],
+ edu:[['degree','Degree'],['school','School'],['dates','Dates'],['bullets','Details (one per line)','ta']],
+ cert:[['name','Certification'],['issuer','Issuer'],['dates','Date']],
+ custom:[['heading','Section title'],['bullets','Content (one per line)','ta']]
+};
+const LABEL={summary:'Summary',exp:'Experience',proj:'Projects',edu:'Education',skills:'Skills',cert:'Certifications',lang:'Languages'};
+const DEFAULT_LAYOUT=()=>['summary','exp','proj','edu','skills','cert','lang'].map(k=>({k,show:true}));
+const PAPER={A4:[210,297],Letter:[215.9,279.4]};
+let layout=DEFAULT_LAYOUT(), photo='';
+
+function addEntry(type,data={}){
+ const box=document.createElement('div');box.className='entry';
+ TPL[type].forEach(([n,ph,k])=>{
+  const el=document.createElement(k?'textarea':'input');
+  el.className='form-control form-control-sm mb-2';el.name=n;el.placeholder=ph;el.value=data[n]||'';
+  if(k)el.rows=3;box.appendChild(el);
+ });
+ const bar=document.createElement('div');bar.className='d-flex gap-2';
+ const mk=(t,fn,c='')=>{const b=document.createElement('button');b.className='btn btn-link btn-sm p-0 '+c;b.textContent=t;b.onclick=()=>{fn();update()};bar.appendChild(b)};
+ mk('Move up',()=>box.previousElementSibling&&box.parentNode.insertBefore(box,box.previousElementSibling));
+ mk('Move down',()=>box.nextElementSibling&&box.parentNode.insertBefore(box.nextElementSibling,box));
+ mk('Remove',()=>box.remove(),'text-danger');
+ box.appendChild(bar);$('#'+type).appendChild(box);
+}
+const grp=b=>[...b.children].map(c=>Object.fromEntries([...c.querySelectorAll('[name]')].map(i=>[i.name,i.value.trim()])));
+const rd=i=>i.type==='checkbox'?i.checked:i.value.trim();
+function getData(){
+ const f=id=>Object.fromEntries([...document.querySelectorAll(id+' [name]')].map(i=>[i.name,rd(i)]));
+ return{d:f('#design'),po:f('#photoOpts'),p:f('#personal'),summary:$('#summary').value.trim(),skills:$('#skills').value.trim(),lang:$('#lang').value.trim(),
+  exp:grp($('#exp')),proj:grp($('#proj')),edu:grp($('#edu')),cert:grp($('#cert')),custom:grp($('#custom')),photo,layout};
+}
+function setData(d){
+ const put=(id,o)=>document.querySelectorAll(id+' [name]').forEach(i=>{const v=o&&o[i.name];if(v===undefined)return;i.type==='checkbox'?i.checked=v:i.value=v});
+ put('#design',d.d);put('#photoOpts',d.po);put('#personal',d.p);
+ $('#summary').value=d.summary||'';$('#skills').value=d.skills||'';$('#lang').value=d.lang||'';
+ photo=d.photo||'';layout=d.layout||DEFAULT_LAYOUT();
+ ['exp','proj','edu','cert','custom'].forEach(t=>{$('#'+t).innerHTML='';(d[t]||[]).forEach(x=>addEntry(t,x))});
+}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const list=t=>{const l=(t||'').split('\n').map(x=>x.trim()).filter(Boolean);return l.length?'<ul>'+l.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':''};
+const sec=(h,b)=>b?`<h2>${esc(h)}</h2>${b}`:'';
+const row=(a,b)=>`<div class="row1"><span>${esc(a)}</span><span>${esc(b||'')}</span></div>`;
+
+function render(){
+ const d=getData(),p=d.p;
+ const R={
+  summary:sec('Summary',d.summary?`<p>${esc(d.summary)}</p>`:''),
+  exp:sec('Experience',d.exp.filter(e=>e.title||e.company).map(e=>`<div class="item">${row(e.title,e.dates)}<div class="sub">${[e.company,e.loc].filter(Boolean).map(esc).join(', ')}</div>${list(e.bullets)}</div>`).join('')),
+  proj:sec('Projects',d.proj.filter(e=>e.name).map(e=>`<div class="item">${row(e.name,e.dates)}${e.link?`<div class="sub">${esc(e.link)}</div>`:''}${list(e.bullets)}</div>`).join('')),
+  edu:sec('Education',d.edu.filter(e=>e.degree||e.school).map(e=>`<div class="item">${row(e.degree,e.dates)}<div class="sub">${esc(e.school)}</div>${list(e.bullets)}</div>`).join('')),
+  skills:sec('Skills',d.skills?`<p>${esc(d.skills)}</p>`:''),
+  cert:sec('Certifications',d.cert.filter(e=>e.name).map(e=>`<div class="item">${row([e.name,e.issuer].filter(Boolean).join(', '),e.dates)}</div>`).join('')),
+  lang:sec('Languages',d.lang?`<p>${esc(d.lang)}</p>`:'')
+ };
+ const contact=[p.email,p.phone,p.location,p.link,p.link2].filter(Boolean).map(esc).join(' | ');
+ const img=d.po.photoOn&&photo?`<img class="ph ${d.po.shape==='round'?'round':''}" src="${photo}" alt="Profile photo">`:'';
+ const body=layout.filter(s=>s.show).map(s=>R[s.k]).join('')+d.custom.filter(c=>c.heading&&c.bullets).map(c=>sec(c.heading,list(c.bullets))).join('');
+ const cv=$('#cv'),x=d.d,[w,h]=PAPER[x.paper]||PAPER.A4;
+ cv.className=(x.caps?'caps ':'')+'h-'+(x.hstyle||'line')+(x.align==='center'?' center':'');
+ cv.style.cssText=`--f:${x.font};--sz:${x.size}pt;--lh:${x.lh};--c:${x.color};--n:${x.colorName?x.color:'#000'};--t:color-mix(in srgb,${x.color} 12%,white);width:${w}mm;min-height:${h}mm;padding:${x.margin}mm`;
+ $('#pg').textContent=`@page{size:${x.paper==='Letter'?'letter':'A4'};margin:${x.margin}mm}`;
+ ['size','lh','margin'].forEach(k=>$('#v_'+k).textContent=x[k]);
+ cv.innerHTML=`<div class="hdr"><div><h1>${esc(p.name||'Your Name')}</h1>${p.title?`<div class="ttl">${esc(p.title)}</div>`:''}${contact?`<div class="ct">${contact}</div>`:''}</div>${img}</div>`+body;
+ ats(d,cv,h);
+ try{localStorage.setItem(KEY,JSON.stringify(d))}catch(e){}
+}
+function contrast(hex){const v=[1,3,5].map(i=>{const c=parseInt(hex.substr(i,2),16)/255;return c<=.03928?c/12.92:Math.pow((c+.055)/1.055,2.4)});return 1.05/(.2126*v[0]+.7152*v[1]+.0722*v[2]+.05)}
+function ats(d,cv,h){
+ const pages=Math.ceil((cv.scrollHeight-4)/(h*96/25.4)),bul=[...d.exp,...d.proj].some(e=>(e.bullets||'').trim());
+ const c=[
+  [d.p.name,'Name added','Add your full name'],
+  [d.p.email&&d.p.phone,'Email and phone added','Add both email and phone'],
+  [d.summary,'Summary added','Add a short summary with keywords from the job ad'],
+  [d.exp.some(e=>e.title),'Experience added','Add at least one job'],
+  [bul,'Achievements use bullet points','Describe work with bullet points'],
+  [d.skills,'Skills section present','Add a Skills section for keyword matching'],
+  [!(d.po.photoOn&&photo),'No photo (safest for ATS)','Photo is on: some ATS tools ignore or reject it'],
+  [+d.d.size>=10,'Text size is readable','Text under 10 pt can be hard to parse and read'],
+  [contrast(d.d.color)>=4.5,'Accent color is dark enough to read and print','Accent color is too light: choose a darker shade'],
+  [true,'Single column, real text, no tables or graphics',''],
+  [pages<=2,`Length: about ${pages} page${pages>1?'s':''}`,`About ${pages} pages: aim for 1 or 2`]
+ ];
+ $('#ats').innerHTML=c.map(([ok,y,n])=>`<li class="${ok?'ok':'warn'}">${ok?'OK: '+y:'Check: '+n}</li>`).join('');
+}
+function drawOrder(){
+ $('#order').innerHTML=layout.map((s,i)=>`<div class="d-flex align-items-center gap-2 mb-1"><input type="checkbox" class="form-check-input m-0" data-vis="${i}" ${s.show?'checked':''}><span class="me-auto">${LABEL[s.k]}</span><button class="btn btn-outline-secondary btn-sm py-0" data-mv="${i}" data-d="-1">&#9650;</button><button class="btn btn-outline-secondary btn-sm py-0" data-mv="${i}" data-d="1">&#9660;</button></div>`).join('');
+}
+$('#order').onclick=e=>{
+ const t=e.target;
+ if(t.dataset.vis!==undefined)layout[t.dataset.vis].show=t.checked;
+ else if(t.dataset.mv!==undefined){const i=+t.dataset.mv,j=i+ +t.dataset.d;if(layout[j])[layout[i],layout[j]]=[layout[j],layout[i]];}
+ else return;
+ drawOrder();update();
+};
+function update(){render()}
+document.addEventListener('input',e=>{if(e.target.closest('.editor'))update()});
+document.addEventListener('change',e=>{if(e.target.closest('.editor'))update()});
+
+$('#photo').onchange=e=>{
+ const f=e.target.files[0];if(!f)return;const im=new Image();
+ im.onload=()=>{const c=document.createElement('canvas');c.width=c.height=300;const s=Math.min(im.width,im.height);
+  c.getContext('2d').drawImage(im,(im.width-s)/2,(im.height-s)/2,s,s,0,0,300,300);
+  photo=c.toDataURL('image/jpeg',.85);$('[name=photoOn]').checked=true;URL.revokeObjectURL(im.src);update()};
+ im.src=URL.createObjectURL(f);
+};
+document.querySelectorAll('.sw').forEach(b=>b.onclick=()=>{$('[name=color]').value=b.dataset.c;update()});
+$('#rmPhoto').onclick=()=>{photo='';$('#photo').value='';$('[name=photoOn]').checked=false;update()};
+$('#backup').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(getData())],{type:'application/json'}));a.download='cv-data.json';a.click()};
+$('#restore').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
+ r.onload=()=>{try{setData(JSON.parse(r.result));drawOrder();update()}catch(x){alert('That file is not a valid CV backup.')}};r.readAsText(f)};
+$('#reset').onclick=()=>{if(confirm('Delete everything you entered?')){try{localStorage.removeItem(KEY)}catch(e){}location.reload()}};
+$('#sample').onclick=()=>{
+ if(!confirm('Replace the current form with sample data?'))return;
+ setData({d:getData().d,po:{photoOn:false,shape:'round'},
+  p:{name:'Alex Morgan',title:'Software Engineer',email:'alex@example.com',phone:'+1 555 010 2030',location:'Austin, USA',link:'linkedin.com/in/alexmorgan',link2:'github.com/alexmorgan'},
+  summary:'Software engineer with 5 years of experience building web applications in JavaScript and Python. Focused on reliable, well-tested code.',
+  skills:'JavaScript, TypeScript, React, Node.js, Python, SQL, Git, REST APIs',lang:'English (native), Spanish (professional)',
+  exp:[{title:'Software Engineer',company:'Northwind Labs',loc:'Austin, TX',dates:'Mar 2021 - Present',bullets:'Built a billing dashboard used by 4,000 customers\nCut page load time by 40% through code splitting\nMentored 3 junior developers'}],
+  proj:[{name:'Open-source CLI tool',link:'github.com/alexmorgan/cli',dates:'2023',bullets:'Published a command-line tool with 800 GitHub stars'}],
+  edu:[{degree:'BSc Computer Science',school:'University of Texas',dates:'2016 - 2020',bullets:''}],
+  cert:[{name:'AWS Certified Developer',issuer:'Amazon Web Services',dates:'2022'}],custom:[],photo:'',layout:DEFAULT_LAYOUT()});
+ drawOrder();update();
+};
+
+/*PDFIMPORT-START*/
+const MON='(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\\.?\\s*,?\\s*',YR='(?:19|20)\\d{2}';
+const DATE=new RegExp('(?:'+MON+')?'+YR+'(?:\\s*(?:-|–|—|to)\\s*(?:(?:'+MON+')?'+YR+'|present|current|now|ongoing|today))?','i');
+const BUL=/^\s*(?:[•●▪■◦○▫‣∙·\u2022\uF0A7\uF0B7\uF076]\s*|[-–—*]\s+)/;
+const HEADS=[
+ ['summary',/^((professional|career|executive) )?(summary|profile|objective|overview)$|^about( me)?$|^personal statement$/i],
+ ['exp',/^((work|professional|employment|relevant|career) )?(experience|history)$|^employment$/i],
+ ['edu',/^education(al)?( (and|&) (training|qualifications?))?$|^academic (background|qualifications?|record)$|^qualifications?$/i],
+ ['skills',/^((technical|key|core|professional|soft|hard) )?skills( (and|&) \w+)?$|^(core )?competencies$|^technologies$|^(areas of )?expertise$/i],
+ ['proj',/^((personal|academic|key|selected|side) )?projects$/i],
+ ['cert',/^(licen[sc]es( (and|&) certifications?)?|certifications?|certificates?|courses|training( (and|&) certifications?)?)$/i],
+ ['lang',/^languages?$/i],
+ ['custom',/^(awards?( (and|&) \w+)?|honou?rs|achievements|interests|hobbies|references|volunteer(ing)?( experience)?|publications|activities|extracurricular( activities)?|leadership)$/i]
+];
+const TITLE=/engineer|developer|manager|analyst|designer|intern|consultant|assistant|director|lead\b|officer|specialist|executive|coordinator|administrator|architect|teacher|nurse|accountant|associate|head\b|supervisor|representative|technician|scientist|researcher|writer|editor|marketer|programmer|trainee|clerk/i;
+const LOC=/^[A-Z][A-Za-z.'\- ]+,\s*[A-Z][A-Za-z.'\- ]+$/, COMP=/\b(inc|ltd|llc|corp|co|limited|plc|gmbh)\b\.?$/i;
+const titleCase=t=>t.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());
+const headType=l=>{const t=l.replace(/[:\s]+$/,'').replace(/^[^A-Za-z]+/,'').trim();if(!t||t.length>45)return null;const h=HEADS.find(([k,r])=>r.test(t));return h?[h[0],t]:null};
+const splitParts=t=>t.split(/\s*\|\s*|\s[–—-]\s|\s@\s|\s[•·]\s/).map(x=>x.trim()).filter(Boolean);
+const clean=t=>t.replace(/^[\s|,\-–—]+|[\s|,\-–—]+$/g,'').replace(/(\|\s*){2,}/g,'| ');
+function takeDate(t){const m=t.match(DATE);return m?[m[0].trim(),t.replace(m[0],' ').replace(/[()\[\]]/g,' ').replace(/\s+/g,' ').trim()]:['',t]}
+
+async function pdfLines(file){
+ const pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise,out=[];
+ for(let n=1;n<=pdf.numPages;n++){
+  const tc=await(await pdf.getPage(n)).getTextContent(),rows=[];
+  tc.items.forEach(it=>{if(!it.str.trim())return;const x=it.transform[4],y=it.transform[5];
+   let r=rows.find(r=>Math.abs(r.y-y)<3);if(!r){r={y,items:[]};rows.push(r)}r.items.push({x,w:it.width,s:it.str})});
+  rows.sort((a,b)=>b.y-a.y).forEach(r=>{r.items.sort((a,b)=>a.x-b.x);let t='',end=null;
+   r.items.forEach(i=>{if(end!==null){const g=i.x-end;if(g>25)t+=' | ';else if(g>1.5&&!/\s$/.test(t)&&!/^\s/.test(i.s))t+=' '}t+=i.s;end=i.x+i.w});
+   out.push(t.replace(/\s+/g,' ').trim())});
+ }
+ return out.filter(Boolean);
+}
+
+function entry(type,e){
+ const [dates,rest]=takeDate(e.head.join(' | ')),parts=splitParts(clean(rest)),bullets=e.bul.join('\n');
+ if(type==='exp'){
+  let loc='',rem=[];parts.forEach(p=>{if(!loc&&LOC.test(p)&&!COMP.test(p)&&!TITLE.test(p))loc=p;else rem.push(p)});
+  if(rem.length===1&&rem[0].includes(',')){const q=rem[0].split(/,\s*/);rem=[q[0],q[1]||''].filter(Boolean);if(q.length>2&&!loc)loc=q.slice(2).join(', ')}
+  const ti=rem.findIndex(p=>TITLE.test(p)),t=ti>=0?rem[ti]:(rem[0]||''),c=ti>=0?rem.filter((_,i)=>i!==ti).join(', '):rem.slice(1).join(', ');
+  return{title:t,company:c,loc,dates,bullets};
+ }
+ if(type==='edu'){
+  const di=parts.findIndex(p=>/bachelor|master|b\.?\s?sc|m\.?\s?sc|\bb\.?a\b|\bm\.?a\b|ph\.?d|diploma|degree|mba|b\.?\s?tech|m\.?\s?tech|associate|certificate|\bhsc\b|\bssc\b|high school|\bb\.?e\b|\bb\.?s\b|\bm\.?s\b/i.test(p));
+  const si=parts.findIndex((p,i)=>/university|college|school|institute|academy|polytechnic/i.test(p)&&i!==di);
+  return{degree:di>=0?parts[di]:(parts.find((_,i)=>i!==si)||''),school:si>=0?parts[si]:(parts.find((_,i)=>i!==di)||''),dates,bullets};
+ }
+ const link=(rest.match(/(?:https?:\/\/|www\.|github\.com)\S+/i)||[''])[0];
+ return{name:parts.find(p=>!/https?:|www\.|github\.com/i.test(p))||'',link,dates,bullets};
+}
+
+function parseEntries(type,L){
+ const out=[];let cur=null;const mk=()=>({head:[],bul:[],marked:false,hasDate:false,lastB:false});
+ const push=()=>{if(cur&&(cur.head.length||cur.bul.length))out.push(entry(type,cur));cur=null};
+ L.forEach(line=>{
+  const isB=BUL.test(line),t=line.replace(BUL,'').trim();if(!t)return;
+  if(isB){if(!cur)cur=mk();cur.marked=true;cur.bul.push(t);cur.lastB=true;return}
+  if(cur&&cur.lastB&&/^[a-z(,;]/.test(t)){cur.bul[cur.bul.length-1]+=' '+t;return}
+  const hasD=DATE.test(t);
+  if(!cur)cur=mk();
+  else if(cur.marked&&cur.bul.length){push();cur=mk()}
+  else if(hasD&&cur.hasDate){
+   let carry=null;const l=cur.bul[cur.bul.length-1];
+   if(!cur.marked&&l&&l.length<60&&!/[.!?]$/.test(l))carry=cur.bul.pop();
+   push();cur=mk();if(carry)cur.head.push(carry);
+  }
+  else if(cur.head.length>=3||(cur.hasDate&&cur.head.length>=2)){cur.bul.push(t);cur.lastB=false;return}
+  cur.head.push(t);if(hasD)cur.hasDate=true;cur.lastB=false;
+ });
+ push();return out;
+}
+
+function parseCV(lines){
+ const base=getData(),d={d:base.d,po:base.po,photo:base.photo,layout:base.layout,p:{},summary:'',skills:'',lang:'',exp:[],proj:[],edu:[],cert:[],custom:[]};
+ const secs=[{k:'header',h:'',lines:[]}];
+ lines.forEach(l=>{const h=headType(l);if(h)secs.push({k:h[0],h:h[1],lines:[]});else secs[secs.length-1].lines.push(l)});
+ const rest=[];
+ secs[0].lines.flatMap(l=>l.split(/\s*[|•·●▪]\s*|\s{3,}/)).map(s=>s.trim()).filter(Boolean).forEach(s=>{
+  let t=s.replace(/^(e-?mail|phone|tel|mobile|linkedin|github|address|portfolio|website)\s*:\s*/i,'');
+  const em=t.match(/[\w.+-]+@[\w-]+(\.[\w-]+)+/);if(em){d.p.email=d.p.email||em[0];t=t.replace(em[0],' ')}
+  const ph=t.match(/\+?\(?\d[\d\s().-]{7,}\d/);if(ph){d.p.phone=d.p.phone||ph[0].trim();t=t.replace(ph[0],' ')}
+  const u=t.match(/(?:https?:\/\/)?(?:www\.)?(?:[\w-]+\.)+(?:com|io|dev|me|net|org|co)\b\/?\S*/i);
+  if(u){if(/linkedin/i.test(u[0]))d.p.link=d.p.link||u[0];else d.p.link2=d.p.link2||u[0];t=t.replace(u[0],' ')}
+  t=t.replace(/\s+/g,' ').replace(/^[\s,:;|-]+|[\s,:;|-]+$/g,'');
+  if(t.length>1&&!/^(e-?mail|phone|tel|mobile|linkedin|github|address|portfolio|website)$/i.test(t))rest.push(t);
+ });
+ const ok=t=>!/\d/.test(t)&&t.split(/\s+/).length<=6&&t.length<=60;
+ const raw=rest.find(t=>ok(t)&&!/resume|curriculum|^cv$/i.test(t)&&!LOC.test(t))||'';
+ const name=raw&&raw===raw.toUpperCase()?titleCase(raw):raw;
+ d.p.name=name;
+ const loc=rest.find(t=>LOC.test(t)&&t!==raw);if(loc)d.p.location=loc;
+ const ti=rest.find(t=>ok(t)&&t!==raw&&t!==loc);if(ti)d.p.title=ti;
+ const longT=rest.find(t=>t.length>80);if(longT)d.summary=longT;
+ secs.slice(1).forEach(s=>{
+  const L=s.lines,txt=L.map(l=>l.replace(BUL,'').trim());
+  if(s.k==='summary')d.summary=txt.join(' ');
+  else if(s.k==='skills')d.skills=[d.skills,txt.join(', ')].filter(Boolean).join(', ').replace(/,\s*,/g,',').replace(/,\s*$/,'');
+  else if(s.k==='lang')d.lang=[d.lang,txt.join(', ')].filter(Boolean).join(', ');
+  else if(s.k==='cert')txt.forEach(t=>{const[dt,r]=takeDate(t),p=splitParts(clean(r));if(p.length)d.cert.push({name:p[0],issuer:p.slice(1).join(', '),dates:dt})});
+  else if(s.k==='custom')d.custom.push({heading:titleCase(s.h),bullets:txt.join('\n')});
+  else d[s.k].push(...parseEntries(s.k,L));
+ });
+ return d;
+}
+
+$('#pdfImport').onchange=async e=>{
+ const f=e.target.files[0];e.target.value='';if(!f)return;
+ const box=$('#importMsg'),say=(h,c)=>{box.className='alert alert-'+c+' py-2 small';box.innerHTML=h};
+ if(typeof pdfjsLib==='undefined'){say('The PDF reader could not load. Check your internet connection and reload the page.','danger');return}
+ if(!confirm('Importing replaces what is currently in the form. Your design settings and photo are kept. Continue?'))return;
+ say('Reading PDF...','info');
+ try{
+  const lines=await pdfLines(f);
+  if(lines.join(' ').length<80){say('No readable text found. This looks like a scanned or image-only PDF. Export a text-based PDF from Word or Google Docs, or fill the form by hand.','warning');return}
+  const d=parseCV(lines);setData(d);drawOrder();update();
+  document.querySelectorAll('.editor details').forEach(x=>x.open=true);
+  say(`Imported <b>${esc(d.p.name||'your CV')}</b>: ${d.exp.length} job(s), ${d.edu.length} education, ${d.proj.length} project(s), ${d.cert.length} certification(s), ${d.custom.length} other section(s). Review every section and fix anything that looks wrong. The file was read in your browser and not uploaded anywhere.`,'success');
+ }catch(err){console.error(err);say('Could not read this PDF. It may be password protected or damaged.','danger')}
+};
+if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+/*PDFIMPORT-END*/
+
+(function init(){
+ const dflt={font:'Arial, Helvetica, sans-serif',size:'10.5',lh:'1.45',margin:'16',paper:'A4',color:'#1f4e8c',caps:true,hstyle:'line',align:'left',colorName:true};
+ let d=null;try{d=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+ setData(d||{d:dflt,po:{photoOn:false,shape:'round'}});
+ if(!d){addEntry('exp');addEntry('edu')}
+ drawOrder();update();
+})();
+</script>
+</body>
+</html>
